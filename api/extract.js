@@ -24,27 +24,32 @@ export default async function handler(req, res) {
             type: "text",
             text: `This page is from the Swahili devotional book "Siku 365 za Ushindi 2026" by Pastor Tony Osborn.
 
-Extract ONLY what is visibly printed on this page. Do NOT invent or add anything not present.
+Extract ONLY what is visibly printed on this page. Do NOT invent or add anything.
 
-Return ONLY valid JSON with no markdown, no explanation:
+The page structure is always:
+1. Title (bold heading at top)
+2. Scripture/Maandiko block — a Bible reference + verse (sometimes absent)
+3. Body text — paragraphs between scripture and prayers (sometimes absent)
+4. Prayer/Sala/Maombi — the main prayer text (almost always present)
+
+Return ONLY valid JSON, no markdown, no explanation:
 {
-  "day": <integer day of month, e.g. 18>,
+  "day": <integer day of month>,
   "monthNumber": <integer 1-12>,
   "month": "<English month name>",
   "date": "<e.g. March 18>",
-  "title": "<the prayer/section title in bold at the top>",
-  "scripture": "<scripture reference if present, e.g. Warumi 8:37 — empty string if not on this page>",
-  "scriptureText": "<the scripture verse text if present — empty string if not on this page>",
-  "bodyLabel": "<the exact section heading before the body text, e.g. Tafakari, Neno, Maombi ya Ukiri, Declarations — empty string if no such heading exists>",
-  "bodyText": "<the body/devotional text under that heading — empty string if not present>",
-  "prayer": "<the full prayer or Sala text — empty string if not on this page>"
+  "title": "<bold title at top of page>",
+  "scripture": "<Bible reference if present, e.g. Warumi 8:37 (SUV) — empty string if absent>",
+  "scriptureText": "<the Bible verse text if present — empty string if absent>",
+  "bodyText": "<paragraphs between scripture and prayer if present — empty string if absent>",
+  "prayer": "<full prayer/Sala/Maombi text — empty string if not on this page>"
 }
 
-Important rules:
-- If a field is not visible on this page, use empty string.
-- bodyLabel must be the EXACT heading word(s) printed on the page, not a translation.
-- If there is no heading before the body text, leave bodyLabel as empty string.
-- scripture and scriptureText are only for a Bible verse citation block, not general text.`
+Rules:
+- Use empty string "" for any field not visible on this page.
+- bodyText is ONLY the paragraphs that come after the scripture and before the prayer.
+- Do not include section heading words like Tuombe, Maombi, Sala in the prayer field — just the prayer text itself.
+- scripture is only a Bible citation block, not general text.`
           }
         ]
       }]
