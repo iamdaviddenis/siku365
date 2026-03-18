@@ -82,7 +82,6 @@ function buildDerivedEntry(entry) {
     title: firstNonEmpty(pages.map((p) => p.title)),
     scripture: firstNonEmpty(pages.map((p) => p.scripture)),
     scriptureText: combineText(pages.map((p) => p.scriptureText)),
-    bodyLabel: firstNonEmpty(pages.map((p) => p.bodyLabel)),
     bodyText: combineText(pages.map((p) => p.bodyText || p.wordOfDay)),
     prayer: combineText(pages.map((p) => p.prayer))
   };
@@ -336,7 +335,6 @@ export default function Siku365() {
         title: parsed.title || "",
         scripture: parsed.scripture || "",
         scriptureText: parsed.scriptureText || "",
-        bodyLabel: parsed.bodyLabel || "",
         bodyText: parsed.bodyText || parsed.wordOfDay || "",
         prayer: parsed.prayer || "",
         uploadedAt: new Date().toISOString()
@@ -430,7 +428,6 @@ export default function Siku365() {
   function shareWhatsApp(entry) {
     const text = `📖 *${entry.date} — ${entry.title || ""}*
 
-✨ *${entry.bodyLabel || "Neno la Leo"}:*
 ${entry.bodyText || ""}
 
 📜 *${entry.scripture || ""}:*
@@ -557,7 +554,7 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
 
             <div className="summary-card">
               <div className="summary-label">Muhtasari</div>
-              <div className="summary-title">Mwaka mzima · kurasa nyingi kwa siku</div>
+              <div className="summary-title">Muongozo wa Maombi 2026</div>
               <div className="summary-stats">
                 <span>Siku zote: {derivedEntries.length}</span>
                 <span>Machi: {marchUploaded}</span>
@@ -725,29 +722,47 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
               </div>
             )}
 
-            <div className="upload-zone" onClick={openGallery}>
-              {uploading ? (
-                <>
-                  <div style={{ marginBottom: 12 }}>
-                    <span className="spinner" />
-                  </div>
-                  <div className="upload-title">AI inasoma ukurasa...</div>
-                  <div className="upload-sub">Tafadhali subiri kidogo</div>
-                </>
-              ) : (
-                <>
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>📷</div>
-                  <div className="upload-title">
-                    {currentUploadKey ? "Ongeza Ukurasa wa Siku Hii" : "Pakia Ukurasa wa Kwanza"}
-                  </div>
-                  <div className="upload-sub">
-                    {currentUploadKey
-                      ? "Upload hii itaongezwa kwenye siku ile ile."
-                      : "Kwa ukurasa wa kwanza, hakikisha tarehe inaonekana juu."}
-                  </div>
-                </>
-              )}
-            </div>
+            {uploading ? (
+              <div className="upload-zone">
+                <div style={{ marginBottom: 12 }}><span className="spinner" /></div>
+                <div className="upload-title">AI inasoma ukurasa...</div>
+                <div className="upload-sub">Tafadhali subiri kidogo</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+                <button
+                  onClick={openCamera}
+                  style={{
+                    width: "100%", padding: "18px", borderRadius: 14,
+                    background: "linear-gradient(135deg,#1a3d1a,#2d5a2d)",
+                    color: "#f5f0e8", border: "none", cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif", fontSize: 16, fontWeight: 700,
+                    letterSpacing: 1, display: "flex", alignItems: "center",
+                    justifyContent: "center", gap: 10,
+                    boxShadow: "0 4px 16px rgba(26,46,26,0.25)"
+                  }}
+                >
+                  <span style={{ fontSize: 24 }}>📷</span> Piga Picha
+                </button>
+                <button
+                  onClick={openGallery}
+                  style={{
+                    width: "100%", padding: "18px", borderRadius: 14,
+                    background: "#fff", color: "#1a3d1a",
+                    border: "2px solid #1a3d1a", cursor: "pointer",
+                    fontFamily: "'Lato',sans-serif", fontSize: 16, fontWeight: 700,
+                    letterSpacing: 1, display: "flex", alignItems: "center",
+                    justifyContent: "center", gap: 10,
+                    boxShadow: "0 2px 10px rgba(26,46,26,0.1)"
+                  }}
+                >
+                  <span style={{ fontSize: 24 }}>🖼️</span> Chagua kutoka Gallery
+                </button>
+                <div style={{ fontFamily: "'Lato',sans-serif", fontSize: 12, color: "#8a7a5a", textAlign: "center", lineHeight: 1.5 }}>
+                  {currentUploadKey ? "Ukurasa utaongezwa kwenye siku ile ile." : "Kwa ukurasa wa kwanza, hakikisha tarehe inaonekana."}
+                </div>
+              </div>
+            )}
 
             {uploadError && (
               <div style={{ background: "#fff0f0", border: "1px solid #ffaaaa", borderRadius: 10, padding: "14px 16px", fontFamily: "'Lato',sans-serif", fontSize: 13, color: "#c0392b", marginBottom: 12 }}>
@@ -806,7 +821,6 @@ function EntryCard({ entry, isRead, isToday, onMarkRead, onShare, onDeletePage, 
 
       {entry.bodyText && (
         <div className="section">
-          <div className="sec-label">{entry.bodyLabel || "Neno la Leo"}</div>
           <div className="word-text">{entry.bodyText}</div>
         </div>
       )}
