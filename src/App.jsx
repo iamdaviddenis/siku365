@@ -130,6 +130,7 @@ export default function Siku365() {
   const [notifGranted, setNotifGranted] = useState(false);
   const [toast, setToast] = useState(null);
   const [currentUploadKey, setCurrentUploadKey] = useState("");
+  const [previewImage, setPreviewImage] = useState(null);   // { dataUrl, rotation }
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
 
@@ -233,6 +234,13 @@ export default function Siku365() {
     showToast("Sasa upload inayofuata itaanza siku mpya.");
   }
 
+  function cancelPreview() {
+    if (previewImage?.objectUrl) URL.revokeObjectURL(previewImage.objectUrl);
+    setPreviewImage(null);
+    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
+  }
+
   function openGallery() {
     if (!uploading) fileRef.current?.click();
   }
@@ -240,35 +248,90 @@ export default function Siku365() {
     if (!uploading) cameraRef.current?.click();
   }
 
+  // Read EXIF orientation tag from file bytes
+  async function getExifRotation(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const view = new DataView(e.target.result);
+        if (view.getUint16(0, false) !== 0xFFD8) return resolve(0);
+        let offset = 2;
+        while (offset < view.byteLength) {
+          const marker = view.getUint16(offset, false);
+          offset += 2;
+          if (marker === 0xFFE1) {
+            if (view.getUint32(offset + 2, false) !== 0x45786966) return resolve(0);
+            const little = view.getUint16(offset + 8, false) === 0x4949;
+            const tags = view.getUint16(offset + 14, little);
+            for (let i = 0; i < tags; i++) {
+              if (view.getUint16(offset + 16 + i * 12, little) === 0x0112) {
+                const o = view.getUint16(offset + 16 + i * 12 + 8, little);
+                const deg = o === 3 ? 180 : o === 6 ? 90 : o === 8 ? 270 : 0;
+                return resolve(deg);
+              }
+            }
+            return resolve(0);
+          }
+          if ((marker & 0xFF00) !== 0xFF00) break;
+          offset += view.getUint16(offset, false);
+        }
+        resolve(0);
+      };
+      reader.readAsArrayBuffer(file.slice(0, 65536));
+    });
+  }
+
   async function handleUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
     setUploadError("");
     setUploadResult(null);
+
+    // Step 1: show preview with auto-detected rotation
+    const exifDeg = await getExifRotation(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewImage({ objectUrl, rotation: exifDeg, file });
+    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
+  }
+
+  function rotatePreview(delta) {
+    setPreviewImage(prev => prev ? { ...prev, rotation: (prev.rotation + delta + 360) % 360 } : prev);
+  }
+
+  async function confirmUpload() {
+    if (!previewImage) return;
+    const { objectUrl, rotation, file } = previewImage;
+    setPreviewImage(null);
+    setUploading(true);
+    setUploadError("");
 
     try {
       const base64 = await new Promise((resolve, reject) => {
         const img = new Image();
-        const url = URL.createObjectURL(file);
         img.onload = () => {
-          URL.revokeObjectURL(url);
+          URL.revokeObjectURL(objectUrl);
+          const rad = (rotation * Math.PI) / 180;
+          const sin = Math.abs(Math.sin(rad)), cos = Math.abs(Math.cos(rad));
           const MAX = 1200;
-          let w = img.width, h = img.height;
-          if (w > MAX || h > MAX) {
-            if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-            else { w = Math.round(w * MAX / h); h = MAX; }
-          }
+          let sw = img.width, sh = img.height;
+          // canvas dimensions after rotation
+          const cw = Math.round(sw * cos + sh * sin);
+          const ch = Math.round(sw * sin + sh * cos);
+          // scale down if needed
+          const scale = Math.min(1, MAX / Math.max(cw, ch));
+          const fw = Math.round(cw * scale), fh = Math.round(ch * scale);
           const canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
+          canvas.width = fw; canvas.height = fh;
           const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-          resolve(dataUrl.split(",")[1]);
+          ctx.translate(fw / 2, fh / 2);
+          ctx.rotate(rad);
+          ctx.drawImage(img, -sw * scale / 2, -sh * scale / 2, sw * scale, sh * scale);
+          resolve(canvas.toDataURL("image/jpeg", 0.82).split(",")[1]);
         };
         img.onerror = reject;
-        img.src = url;
+        img.src = objectUrl;
       });
 
       const resp = await fetch("/api/extract", {
@@ -722,7 +785,43 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
               </div>
             )}
 
-            {uploading ? (
+            {previewImage ? (
+              <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 8px 32px rgba(26,46,26,0.15)", marginBottom: 16 }}>
+                <div style={{ background: "#1a3d1a", padding: "12px 16px", fontFamily: "'Lato',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#d4af37" }}>
+                  Kagua Picha — Rekebisha kama ni lazima
+                </div>
+                <div style={{ padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: "100%", maxHeight: 340, overflow: "hidden", borderRadius: 10, background: "#f0ebe0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <img
+                      src={previewImage.objectUrl}
+                      alt="Preview"
+                      style={{
+                        maxWidth: "100%", maxHeight: 340,
+                        transform: `rotate(${previewImage.rotation}deg)`,
+                        transition: "transform 0.3s ease",
+                        objectFit: "contain"
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 10, width: "100%" }}>
+                    <button onClick={() => rotatePreview(-90)} style={{ flex: 1, padding: "12px", borderRadius: 10, background: "#f0ebe0", border: "none", cursor: "pointer", fontFamily: "'Lato',sans-serif", fontSize: 14, fontWeight: 700, color: "#1a2e1a" }}>
+                      ↺ Kushoto
+                    </button>
+                    <button onClick={() => rotatePreview(90)} style={{ flex: 1, padding: "12px", borderRadius: 10, background: "#f0ebe0", border: "none", cursor: "pointer", fontFamily: "'Lato',sans-serif", fontSize: 14, fontWeight: 700, color: "#1a2e1a" }}>
+                      Kulia ↻
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, width: "100%" }}>
+                    <button onClick={cancelPreview} style={{ flex: 1, padding: "14px", borderRadius: 10, background: "transparent", border: "1.5px solid #1a3d1a", cursor: "pointer", fontFamily: "'Lato',sans-serif", fontSize: 14, fontWeight: 700, color: "#1a3d1a" }}>
+                      Ghairi
+                    </button>
+                    <button onClick={confirmUpload} style={{ flex: 2, padding: "14px", borderRadius: 10, background: "linear-gradient(135deg,#1a3d1a,#2d5a2d)", border: "none", cursor: "pointer", fontFamily: "'Lato',sans-serif", fontSize: 14, fontWeight: 700, color: "#f5f0e8" }}>
+                      ✓ Tuma kwa AI
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : uploading ? (
               <div className="upload-zone">
                 <div style={{ marginBottom: 12 }}><span className="spinner" /></div>
                 <div className="upload-title">AI inasoma ukurasa...</div>
