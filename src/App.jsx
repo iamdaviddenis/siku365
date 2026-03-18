@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const STORAGE_KEY = "siku365-entries-v4";
 const READ_KEY = "siku365-read-v4";
@@ -488,6 +488,19 @@ export default function Siku365() {
     showToast("Siku imefutwa ✓");
   }
 
+  function editEntry(entryKey, fields) {
+    const entry = entries[entryKey];
+    if (!entry) return;
+    // fields: { title, scripture, scriptureText, bodyText, prayer }
+    // We update the first page with the edited values, or create one if none
+    const pages = entry.pages?.length
+      ? entry.pages.map((p, i) => i === 0 ? { ...p, ...fields } : p)
+      : [{ id: "manual-edit", uploadedAt: new Date().toISOString(), ...fields }];
+    const updated = { ...entries, [entryKey]: { ...entry, pages } };
+    saveEntries(updated);
+    showToast("Mabadiliko yamehifadhiwa ✓");
+  }
+
   function shareWhatsApp(entry) {
     const text = `📖 *${entry.date} — ${entry.title || ""}*
 
@@ -649,6 +662,7 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
                 onShare={shareWhatsApp}
                 onDeletePage={(pageId) => deletePage(todayKey, pageId)}
                 onDeleteEntry={() => deleteEntry(todayKey)}
+                onEdit={(fields) => editEntry(todayKey, fields)}
               />
             ) : (
               <div className="empty-day">
@@ -700,6 +714,7 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
                     onShare={shareWhatsApp}
                     onDeletePage={(pageId) => deletePage(selectedEntry.key, pageId)}
                     onDeleteEntry={() => deleteEntry(selectedEntry.key)}
+                    onEdit={(fields) => editEntry(selectedEntry.key, fields)}
                   />
                 )}
               </>
@@ -899,7 +914,89 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
   );
 }
 
-function EntryCard({ entry, isRead, isToday, onMarkRead, onShare, onDeletePage, onDeleteEntry }) {
+function EntryCard({ entry, isRead, isToday, onMarkRead, onShare, onDeletePage, onDeleteEntry, onEdit }) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState({});
+
+  function startEdit() {
+    setDraft({
+      title: entry.title || "",
+      scripture: entry.scripture || "",
+      scriptureText: entry.scriptureText || "",
+      bodyText: entry.bodyText || "",
+      prayer: entry.prayer || ""
+    });
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    onEdit(draft);
+    setEditing(false);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setDraft({});
+  }
+
+  const ta = (field, rows, placeholder) => (
+    <textarea
+      value={draft[field] || ""}
+      onChange={e => setDraft(d => ({ ...d, [field]: e.target.value }))}
+      rows={rows}
+      placeholder={placeholder}
+      style={{
+        width: "100%", padding: "10px 12px", borderRadius: 8,
+        border: "1.5px solid #c8b896", fontFamily: "'Georgia',serif",
+        fontSize: 14, lineHeight: 1.7, color: "#1a2e1a",
+        background: "#fdfaf4", resize: "vertical", outline: "none",
+        boxSizing: "border-box"
+      }}
+    />
+  );
+
+  if (editing) {
+    return (
+      <div className="entry-card">
+        <div className="entry-header">
+          <div className="entry-day-bg">{entry.day}</div>
+          <div className="entry-day-label">✏️ Hariri · {entry.date}</div>
+          <div className="entry-title">{entry.title || "(Bila kichwa)"}</div>
+        </div>
+
+        <div className="section">
+          <div className="sec-label">Kichwa</div>
+          {ta("title", 2, "Kichwa cha sala...")}
+        </div>
+
+        <div className="section">
+          <div className="sec-label">Maandiko — Rejea</div>
+          {ta("scripture", 1, "e.g. Warumi 8:37 (SUV)")}
+        </div>
+
+        <div className="section">
+          <div className="sec-label">Maandiko — Mstari</div>
+          {ta("scriptureText", 3, "Andika mstari wa Biblia hapa...")}
+        </div>
+
+        <div className="section">
+          <div className="sec-label">Maelezo (kati ya Maandiko na Sala)</div>
+          {ta("bodyText", 5, "Maelezo au tafakari... (acha wazi kama hayapo)")}
+        </div>
+
+        <div className="section">
+          <div className="sec-label">Sala</div>
+          {ta("prayer", 10, "Andika sala hapa...")}
+        </div>
+
+        <div className="action-row">
+          <button className="btn btn-primary" onClick={saveEdit}>✓ Hifadhi</button>
+          <button className="btn btn-outline" onClick={cancelEdit}>Ghairi</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="entry-card">
       <div className="entry-header">
@@ -958,22 +1055,13 @@ function EntryCard({ entry, isRead, isToday, onMarkRead, onShare, onDeletePage, 
 
       <div className="action-row">
         {!isRead ? (
-          <button className="btn btn-read" onClick={onMarkRead}>
-            ✓ Imesomwa
-          </button>
+          <button className="btn btn-read" onClick={onMarkRead}>✓ Imesomwa</button>
         ) : (
-          <span style={{ fontFamily: "'Lato',sans-serif", fontSize: 11, fontWeight: 700, color: "#2d5a2d", display: "flex", alignItems: "center", gap: 4 }}>
-            ✅ Imesomwa
-          </span>
+          <span style={{ fontFamily: "'Lato',sans-serif", fontSize: 11, fontWeight: 700, color: "#2d5a2d", display: "flex", alignItems: "center", gap: 4 }}>✅ Imesomwa</span>
         )}
-
-        <button className="btn btn-wa" onClick={() => onShare(entry)}>
-          📤 WhatsApp
-        </button>
-
-        <button className="btn btn-danger" onClick={onDeleteEntry}>
-          🗑️ Futa Siku
-        </button>
+        <button className="btn btn-wa" onClick={() => onShare(entry)}>📤 WhatsApp</button>
+        <button className="btn btn-outline" onClick={startEdit}>✏️ Hariri</button>
+        <button className="btn btn-danger" onClick={onDeleteEntry}>🗑️ Futa</button>
       </div>
     </div>
   );
