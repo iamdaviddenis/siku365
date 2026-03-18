@@ -179,7 +179,51 @@ export default function Siku365() {
   const todayEntry = derivedEntriesByKey[todayKey] || null;
   const selectedEntry = selectedKey ? derivedEntriesByKey[selectedKey] || null : null;
 
-  const marchUploaded = derivedEntries.filter((e) => e.monthNumber === 3).length;
+  const currentMonthNumber = today.getMonth() + 1;
+  const currentMonthName = monthNameFromNumber(currentMonthNumber);
+  // Days in current month
+  const daysInCurrentMonth = new Date(today.getFullYear(), currentMonthNumber, 0).getDate();
+  const currentMonthUploaded = derivedEntries.filter((e) => e.monthNumber === currentMonthNumber).length;
+
+  // Streak calculation based on readDays keys (format "monthNumber-day")
+  const { currentStreak, longestStreak } = useMemo(() => {
+    // Build a Set of date strings "YYYY-MM-DD" for all read days
+    const year = today.getFullYear();
+    const readDates = new Set();
+    for (const key of readDays) {
+      const [m, d] = key.split("-").map(Number);
+      if (!m || !d) continue;
+      const dt = new Date(year, m - 1, d);
+      readDates.add(dt.toDateString());
+    }
+
+    // Current streak — count backwards from today
+    let current = 0;
+    const cursor = new Date(today);
+    while (true) {
+      if (readDates.has(cursor.toDateString())) {
+        current++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else break;
+    }
+
+    // Longest streak — iterate all days of the year up to today
+    let longest = 0, run = 0;
+    const start = new Date(year, 0, 1);
+    const end = new Date(today);
+    const iter = new Date(start);
+    while (iter <= end) {
+      if (readDates.has(iter.toDateString())) {
+        run++;
+        if (run > longest) longest = run;
+      } else {
+        run = 0;
+      }
+      iter.setDate(iter.getDate() + 1);
+    }
+
+    return { currentStreak: current, longestStreak: longest };
+  }, [readDays]);
 
   const searchResults =
     searchQuery.trim().length >= 2
@@ -576,6 +620,7 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
         .notif-banner{background:linear-gradient(135deg,#2d5a2d,#1a3d1a);color:#f5f0e8;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;cursor:pointer}
         .sec-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#1a3d1a;margin-bottom:16px}
         .result-preview{background:#f0f8f0;border-radius:12px;padding:16px;border-left:4px solid #2d5a2d;margin-top:16px}
+        .streak-bar{background:linear-gradient(90deg,#c8470a,#e8701a);height:6px;border-radius:999px;transition:width 0.6s ease}
         .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a3d1a;color:#d4af37;font-family:'Lato',sans-serif;font-size:13px;font-weight:700;padding:12px 24px;border-radius:24px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:999}
         .page-list{display:grid;gap:10px}
         .page-item{background:#faf8f2;border:1px solid #ece4d4;border-radius:10px;padding:12px}
@@ -629,27 +674,31 @@ _Siku 365 za Ushindi 2026 · Pastor Tony Osborn_`;
             )}
 
             <div className="summary-card">
-              <div className="summary-label">Muhtasari</div>
-              <div className="summary-title">Muongozo wa Maombi 2026</div>
+              <div className="summary-label">Muongozo wa Maombi 2026</div>
+              <div className="summary-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {currentStreak > 0 ? `🔥 Streak: ${currentStreak} ${currentStreak === 1 ? "day" : "days"}` : "Anza Streak Yako Leo"}
+              </div>
               <div className="summary-stats">
-                <span>Siku zote: {derivedEntries.length}</span>
-                <span>Machi: {marchUploaded}</span>
-                <span>Zilizosomwa: {readDays.size}</span>
+                <span>Reads: {readDays.size}</span>
+                <span>Best Streak: 🏆 {longestStreak} {longestStreak === 1 ? "day" : "days"}</span>
+                <span>{currentMonthName}: {currentMonthUploaded}/{daysInCurrentMonth}</span>
               </div>
             </div>
 
             <div className="stats-row">
               <div className="stat-card">
-                <div className="stat-number">{derivedEntries.length}</div>
-                <div className="stat-label">Siku Zote</div>
+                <div className="stat-number" style={{ color: currentStreak > 0 ? "#c8470a" : "#1a3d1a" }}>
+                  {currentStreak}
+                </div>
+                <div className="stat-label">🔥 Streak</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">{marchUploaded}</div>
-                <div className="stat-label">Machi</div>
+                <div className="stat-number">{longestStreak}</div>
+                <div className="stat-label">🏆 Best Streak</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">{todayEntry?.pageCount || 0}</div>
-                <div className="stat-label">Kurasa za Leo</div>
+                <div className="stat-number">{readDays.size}</div>
+                <div className="stat-label">✅ Reads</div>
               </div>
             </div>
 
